@@ -38,8 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}", first);
             println!("{}", second);
         }
-        JokeType::Error(error) => {
-            println!("{}", error);
+        JokeType::Error(_) => {
+            let _ = main();
         }
     }
 
