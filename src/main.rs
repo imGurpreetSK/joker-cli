@@ -1,22 +1,26 @@
 mod models;
 use models::Joke;
 
-async fn get_joke(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+#[derive(Debug, PartialEq)]
+enum JokeType {
+    Single(String),
+    TwoPart(String, String),
+    Error(String),
+}
+
+async fn get_joke(url: &str) -> Result<JokeType, Box<dyn std::error::Error>> {
     let response = reqwest::get(url).await?;
     let joke = response.json::<Joke>().await?;
 
-    let mut output = String::new();
-
+    let output: JokeType;
     match joke.error {
         true => {
-            output.push_str("Error occurred while fetching joke");
+            output = JokeType::Error("Error occurred while fetching joke".to_string());
         }
         false => match (joke.joke, joke.setup, joke.delivery) {
-            (Some(joke), _, _) => output.push_str(&joke),
-            (_, Some(setup), Some(delivery)) => {
-                output.push_str(&format!("{}\n\n{}", setup, delivery))
-            }
-            _ => output.push_str("No joke found"),
+            (Some(joke), _, _) => output = JokeType::Single(joke),
+            (_, Some(setup), Some(delivery)) => output = JokeType::TwoPart(setup, delivery),
+            _ => output = JokeType::Error("No joke found".to_string()),
         },
     }
 
@@ -26,7 +30,19 @@ async fn get_joke(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let joke = get_joke("https://v2.jokeapi.dev/joke/Any").await?;
-    println!("{}", joke);
+    match joke {
+        JokeType::Single(joke) => {
+            println!("{}", joke);
+        }
+        JokeType::TwoPart(first, second) => {
+            println!("{}", first);
+            println!("{}", second);
+        }
+        JokeType::Error(error) => {
+            println!("{}", error);
+        }
+    }
+
     Ok(())
 }
 
@@ -58,7 +74,9 @@ mod tests {
 
         assert_eq!(
             result,
-            "Why do programmers prefer dark mode? Because light attracts bugs!"
+            JokeType::Single(
+                "Why do programmers prefer dark mode? Because light attracts bugs!".to_string()
+            )
         );
     }
 
@@ -86,7 +104,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             result,
-            "Why don't programmers like nature?\n\nIt has too many bugs."
+            JokeType::TwoPart(
+                "Why don't programmers like nature?".to_string(),
+                "It has too many bugs.".to_string()
+            )
         );
     }
 
@@ -111,7 +132,10 @@ mod tests {
         let result = get_joke(&format!("{}/joke/Any", server.url()))
             .await
             .unwrap();
-        assert_eq!(result, "Error occurred while fetching joke");
+        assert_eq!(
+            result,
+            JokeType::Error("Error occurred while fetching joke".to_string())
+        );
     }
 
     #[tokio::test]
@@ -133,7 +157,7 @@ mod tests {
         let result = get_joke(&format!("{}/joke/Any", server.url()))
             .await
             .unwrap();
-        assert_eq!(result, "No joke found");
+        assert_eq!(result, JokeType::Error("No joke found".to_string()));
     }
 
     #[tokio::test]
