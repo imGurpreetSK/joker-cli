@@ -1,6 +1,6 @@
 mod models;
 use models::Joke;
-use notify_rust::Notification;
+use notify_rust::{Notification, Timeout};
 
 #[derive(Debug, PartialEq)]
 enum JokeType {
@@ -55,7 +55,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn send_notification(summary: &str, body: &str) -> Result<(), notify_rust::error::Error> {
-    Notification::new().summary(summary).body(body).show()?;
+    Notification::new()
+        .summary(summary)
+        .body(body)
+        .timeout(Timeout::Never) // Make notification manually dismissible
+        .show()?;
     Ok(())
 }
 
