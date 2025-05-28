@@ -1,5 +1,6 @@
 mod models;
 use models::Joke;
+use notify_rust::{Notification, Timeout};
 
 #[derive(Debug, PartialEq)]
 enum JokeType {
@@ -33,16 +34,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match joke {
         JokeType::Single(joke) => {
             println!("{}", joke);
+            if let Err(e) = send_notification("Joke", &joke) {
+                eprintln!("Error sending notification: {:?}", e);
+            }
         }
         JokeType::TwoPart(first, second) => {
             println!("{}", first);
             println!("{}", second);
+            if let Err(e) = send_notification(&first, &second) {
+                eprintln!("Error sending notification: {:?}", e);
+            }
         }
         JokeType::Error(_) => {
+            eprintln!("Error fetching joke, trying again.");
             let _ = main();
         }
     }
 
+    Ok(())
+}
+
+fn send_notification(summary: &str, body: &str) -> Result<(), notify_rust::error::Error> {
+    Notification::new()
+        .summary(summary)
+        .body(body)
+        .timeout(Timeout::Never) // Make notification manually dismissible
+        .show()?;
     Ok(())
 }
 
@@ -167,5 +184,11 @@ mod tests {
 
         let result = get_joke(&format!("{}/joke/Any", server.url())).await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_send_notification_success() {
+        let result = send_notification("Test Summary", "Test Body");
+        assert!(result.is_ok());
     }
 }
