@@ -1,5 +1,6 @@
 mod models;
 use models::Joke;
+use notify_rust::Notification;
 
 #[derive(Debug, PartialEq)]
 enum JokeType {
@@ -33,12 +34,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match joke {
         JokeType::Single(joke) => {
             println!("{}", joke);
+            if let Err(e) = send_notification("Joke", &joke) {
+                eprintln!("Error sending notification: {:?}", e);
+            }
         }
         JokeType::TwoPart(first, second) => {
             println!("{}", first);
             println!("{}", second);
+            if let Err(e) = send_notification(&first, &second) {
+                eprintln!("Error sending notification: {:?}", e);
+            }
         }
         JokeType::Error(_) => {
+            eprintln!("Error fetching joke, trying again.");
             let _ = main();
         }
     }
@@ -46,9 +54,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn send_notification(summary: &str, body: &str) -> Result<(), notify_rust::error::Error> {
+    Notification::new().summary(summary).body(body).show()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_send_notification_success() {
+        let result = send_notification("Test Summary", "Test Body");
+        assert!(result.is_ok());
+    }
 
     #[tokio::test]
     async fn test_single_line_joke() {
